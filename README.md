@@ -59,145 +59,138 @@ Nitro实例（如C5/M5等）。具体操作步骤为，进入CE控制台，在�
 
 4）登录后，运行命令如下：
 
-+----------------------------------------------------------------------+
-| //升级kernal脚本                                                     |
-|                                                                      |
-| cd /etc/yum.repos.d                                                  |
-|                                                                      |
-| ls -A \| xargs -i mv {} {}.bak                                       |
-|                                                                      |
-| wget -O ./CentOS6-Base-163.repo                                      |
-| http://mirrors.163.com/.help/CentOS6-Base-163.repo                   |
-|                                                                      |
-| yum clean all                                                        |
-|                                                                      |
-| nohup yum -y update &                                                |
-|                                                                      |
-| tail -50f nohup.out                                                  |
-|                                                                      |
-| //恢复yum文件后缀名称                                                |
-|                                                                      |
-| find ./ -name \"\*.repo.bak\" \| awk -F \".\" \'{print \$2}\' \|     |
-| xargs -i -t mv ./{}.repo.bak ./{}.repo                               |
-|                                                                      |
-| //重启之后 看kernel版本和升级网卡                                    |
-|                                                                      |
-| reboot                                                               |
-+======================================================================+
-| //查看Linux内核版本命令 ：                                           |
-|                                                                      |
-| uname -a                                                             |
-|                                                                      |
-| //Linux 2.6.32-431.20.3.el6.x86\_64 \#1 SMP Thu Jun 19 21:14:45 UTC  |
-| 2014 x86\_64 x86\_64 x86\_64 GNU/Linux \-\--\> 2.6.32-754            |
-|                                                                      |
-| //升级网卡驱动                                                       |
-|                                                                      |
-| sudo -i                                                              |
-|                                                                      |
-| yum -y install kernel-devel-\$(uname -r) gcc git patch rpm-build     |
-| wget                                                                 |
-|                                                                      |
-| wget https://github.com/amzn/amzn-drivers/archive/master.zip         |
-|                                                                      |
-| unzip master.zip                                                     |
-|                                                                      |
-| cd amzn-drivers-master/kernel/linux/ena                              |
-|                                                                      |
-| make                                                                 |
-|                                                                      |
-| cp ena.ko /lib/modules/\$(uname -r)/                                 |
-|                                                                      |
-| insmod ena.ko                                                        |
-|                                                                      |
-| depmod                                                               |
-|                                                                      |
-| echo \'add\_drivers+=\" ena \"\' \>\> /etc/dracut.conf.d/ena.conf    |
-|                                                                      |
-| dracut -f -v                                                         |
-|                                                                      |
-| lsinitrd /boot/initramfs-2.6.32-754.31.1.el6.x86\_64.img \| grep     |
-| ena.ko                                                               |
-|                                                                      |
-| //安装 DKMS：配置动态内核模块支持 (DKMS)                             |
-| 计划，以确保未来的内核升级期间包括驱动程序。                         |
-|                                                                      |
-| yum reinstall                                                        |
-| http:/                                                               |
-| /dl.fedoraproject.org/pub/epel/6/x86\_64/epel-release-6-8.noarch.rpm |
-|                                                                      |
-| yum -y install dkms                                                  |
-|                                                                      |
-| VER=\$( grep \^VERSION                                               |
-| /root/amzn-drivers-master/kernel/linux/rpm/Makefile \| cut -d\' \'   |
-| -f2 ) \# Detect current version                                      |
-|                                                                      |
-| sudo cp -a /root/amzn-drivers-master /usr/src/amzn-drivers-\${VER}   |
-| \# Copy source into the source directory.                            |
-|                                                                      |
-| cat \> /usr/src/amzn-drivers-\${VER}/dkms.conf \<\<EOM \# Generate   |
-| the dkms config file                                                 |
-|                                                                      |
-| yum -y reinstall                                                     |
-| http:/                                                               |
-| /dl.fedoraproject.org/pub/epel/6/x86\_64/epel-release-6-8.noarch.rpm |
-|                                                                      |
-| yum -y install dkms                                                  |
-|                                                                      |
-| VER=\$( grep \^VERSION                                               |
-| /root/amzn-drivers-master/kernel/linux/rpm/Makefile \| cut -d\' \'   |
-| -f2 )                                                                |
-|                                                                      |
-| sudo cp -a /root/amzn-drivers-master /usr/src/amzn-drivers-\${VER}   |
-|                                                                      |
-| cat \> /usr/src/amzn-drivers-\${VER}/dkms.conf \<\<EOM               |
-|                                                                      |
-| PACKAGE\_NAME=\"ena\"                                                |
-|                                                                      |
-| PACKAGE\_VERSION=\"\$VER\"                                           |
-|                                                                      |
-| CLEAN=\"make -C kernel/linux/ena clean\"                             |
-|                                                                      |
-| MAKE=\"make -C kernel/linux/ena/ BUILD\_KERNEL=\\\${kernelver}\"     |
-|                                                                      |
-| BUILT\_MODULE\_NAME\[0\]=\"ena\"                                     |
-|                                                                      |
-| BUILT\_MODULE\_LOCATION=\"kernel/linux/ena\"                         |
-|                                                                      |
-| DEST\_MODULE\_LOCATION\[0\]=\"/updates\"                             |
-|                                                                      |
-| DEST\_MODULE\_NAME\[0\]=\"ena\"                                      |
-|                                                                      |
-| AUTOINSTALL=\"yes\"                                                  |
-|                                                                      |
-| EOM                                                                  |
-|                                                                      |
-| dkms add -m amzn-drivers -v \$VER                                    |
-|                                                                      |
-| dkms build -m amzn-drivers -v \$VER                                  |
-|                                                                      |
-| dkms install -m amzn-drivers -v \$VER                                |
-|                                                                      |
-| //使用 modinfo 命令确认存在 ENA 模块。                               |
-|                                                                      |
-| modinfo ena                                                          |
-|                                                                      |
-| //将 net.ifnames=0 附加到 /boot/grup/menu.lst 文件的内核行中         |
-|                                                                      |
-| vi /boot/grub/menu.lst                                               |
-|                                                                      |
-| add line as : net.ifnames=0                                          |
-|                                                                      |
-| //运行 \"poweroff\" 以从 SSH 终端停止实例，或使用 AWS 命令行界面     |
-| (AWS CLI) 或 Amazon EC2 控制台停止实例。                             |
-|                                                                      |
-| //启用实例级别的增强网络支持。以下示例从 AWS CLI 修改实例属性：      |
-|                                                                      |
-| poweroff                                                             |
-|                                                                      |
-| aws ec2 modify-instance-attribute \--instance-id i-096b9dcfa6e344e36 |
-| \--ena-support \--region cn-northwest-1                              |
-+----------------------------------------------------------------------+
+//升级kernal脚本
+
+cd /etc/yum.repos.d
+
+ls -A \| xargs -i mv {} {}.bak
+
+wget -O ./CentOS6-Base-163.repo
+http://mirrors.163.com/.help/CentOS6-Base-163.repo
+
+yum clean all
+
+nohup yum -y update &
+
+tail -50f nohup.out
+
+//恢复yum文件后缀名称
+
+find ./ -name \"\*.repo.bak\" \| awk -F \".\" \'{print \$2}\' \| xargs
+-i -t mv ./{}.repo.bak ./{}.repo
+
+//重启之后 看kernel版本和升级网卡
+
+reboot
+
+//查看Linux内核版本命令 ：
+
+uname -a
+
+//Linux 2.6.32-431.20.3.el6.x86\_64 \#1 SMP Thu Jun 19 21:14:45 UTC 2014
+x86\_64 x86\_64 x86\_64 GNU/Linux \-\--\> 2.6.32-754
+
+//升级网卡驱动
+
+sudo -i
+
+yum -y install kernel-devel-\$(uname -r) gcc git patch rpm-build wget
+
+wget https://github.com/amzn/amzn-drivers/archive/master.zip
+
+unzip master.zip
+
+cd amzn-drivers-master/kernel/linux/ena
+
+make
+
+cp ena.ko /lib/modules/\$(uname -r)/
+
+insmod ena.ko
+
+depmod
+
+echo \'add\_drivers+=\" ena \"\' \>\> /etc/dracut.conf.d/ena.conf
+
+dracut -f -v
+
+lsinitrd /boot/initramfs-2.6.32-754.31.1.el6.x86\_64.img \| grep ena.ko
+
+//安装 DKMS：配置动态内核模块支持 (DKMS)
+计划，以确保未来的内核升级期间包括驱动程序。
+
+yum reinstall
+http://dl.fedoraproject.org/pub/epel/6/x86\_64/epel-release-6-8.noarch.rpm
+
+yum -y install dkms
+
+VER=\$( grep \^VERSION
+/root/amzn-drivers-master/kernel/linux/rpm/Makefile \| cut -d\' \' -f2 )
+\# Detect current version
+
+sudo cp -a /root/amzn-drivers-master /usr/src/amzn-drivers-\${VER} \#
+Copy source into the source directory.
+
+cat \> /usr/src/amzn-drivers-\${VER}/dkms.conf \<\<EOM \# Generate the
+dkms config file
+
+yum -y reinstall
+http://dl.fedoraproject.org/pub/epel/6/x86\_64/epel-release-6-8.noarch.rpm
+
+yum -y install dkms
+
+VER=\$( grep \^VERSION
+/root/amzn-drivers-master/kernel/linux/rpm/Makefile \| cut -d\' \' -f2 )
+
+sudo cp -a /root/amzn-drivers-master /usr/src/amzn-drivers-\${VER}
+
+cat \> /usr/src/amzn-drivers-\${VER}/dkms.conf \<\<EOM
+
+PACKAGE\_NAME=\"ena\"
+
+PACKAGE\_VERSION=\"\$VER\"
+
+CLEAN=\"make -C kernel/linux/ena clean\"
+
+MAKE=\"make -C kernel/linux/ena/ BUILD\_KERNEL=\\\${kernelver}\"
+
+BUILT\_MODULE\_NAME\[0\]=\"ena\"
+
+BUILT\_MODULE\_LOCATION=\"kernel/linux/ena\"
+
+DEST\_MODULE\_LOCATION\[0\]=\"/updates\"
+
+DEST\_MODULE\_NAME\[0\]=\"ena\"
+
+AUTOINSTALL=\"yes\"
+
+EOM
+
+dkms add -m amzn-drivers -v \$VER
+
+dkms build -m amzn-drivers -v \$VER
+
+dkms install -m amzn-drivers -v \$VER
+
+//使用 modinfo 命令确认存在 ENA 模块。
+
+modinfo ena
+
+//将 net.ifnames=0 附加到 /boot/grup/menu.lst 文件的内核行中
+
+vi /boot/grub/menu.lst
+
+add line as : net.ifnames=0
+
+//运行 \"poweroff\" 以从 SSH 终端停止实例，或使用 AWS 命令行界面 (AWS
+CLI) 或 Amazon EC2 控制台停止实例。
+
+//启用实例级别的增强网络支持。以下示例从 AWS CLI 修改实例属性：
+
+poweroff
+
+aws ec2 modify-instance-attribute \--instance-id i-096b9dcfa6e344e36
+\--ena-support \--region cn-northwest-1
 
 5）把EC2实例更改为Nitro实例M5，启动EC2。
 网卡自检通过，可以正常的SSH登录。
